@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureScan du groupe 11</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="background"></div>
+
+<div class="card">
+    <h1>🔐 SecureScan</h1>
+    <p class="subtitle">Analyse de vulnérabilités en temps réel</p>
+
+    <input type="text" id="gitLink" placeholder="Lien GitHub...">
+
+    <div class="separator">OU</div>
+
+    <textarea id="codeInput" placeholder="Collez votre code ici..."></textarea>
+
+    <button onclick="analyze()">Analyser le code</button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
