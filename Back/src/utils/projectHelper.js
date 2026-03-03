@@ -1,9 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 
-/**
- * Récupère tous les fichiers d'un projet de manière récursive
- */
+
+// Récupère tous les fichiers d'un projet de manière récursive
+
 function getProjectFiles(projectPath, ignorePatterns = []) {
   const files = [];
 
@@ -43,9 +43,8 @@ function getProjectFiles(projectPath, ignorePatterns = []) {
   return files;
 }
 
-/**
- * Lit le contenu d'un fichier
- */
+
+// Lit le contenu d'un fichier
 function readFileContent(filePath) {
   try {
     const content = fs.readFileSync(filePath, "utf-8");
@@ -56,9 +55,8 @@ function readFileContent(filePath) {
   }
 }
 
-/**
- * Détecte le type de projet
- */
+
+// Détecte le type de projet
 function detectProjectType(projectPath) {
   const files = fs.readdirSync(projectPath);
   const projectInfo = {
