@@ -77,6 +77,17 @@ function detectProjectType(projectPath) {
 }
 
 
+// Compte le nombre de fichiers dans un projet
+function countFiles(projectPath) {
+  try {
+    const files = getProjectFiles(projectPath);
+    return files.length;
+  } catch (error) {
+    console.error(`Erreur comptage fichiers ${projectPath}:`, error.message);
+    return 0;
+  }
+}
+
 // Crée un index des fichiers du projet
 function createProjectIndex(projectPath) {
   const files = getProjectFiles(projectPath);
@@ -102,4 +113,5 @@ module.exports = {
   readFileContent,
   detectProjectType,
   createProjectIndex,
+  countFiles,
 };
