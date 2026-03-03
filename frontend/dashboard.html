@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureScan - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="card large">
+            <h1>📊 Détails du projet</h1>
+
+            <div id="results">
+            </div>
+
+            <div class="actions">
+                <button onclick="deleteProject()">
+                    🗑 Supprimer le projet
+                </button>
+
+                <button class="secondary" onclick="window.location.href='index.html'">
+                    🔙 Retour
+                </button>
+
+                <button class="secondary" onclick="logout()">
+                    🚪 Se déconnecter
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,6 +1,34 @@
 const projectService = require("../services/projectService");
 
 
+// Récupère les projets de l'utilisateur
+// GET /api/projects/user/projects
+const getProjectsByUser = async (req, res) => {
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        error: "Utilisateur non authentifié" 
+      });
+    }
+
+    const projects = await projectService.getProjectsByUserId(userId);
+
+    res.json({
+      success: true,
+      count: projects.length,
+      projects: projects,
+    });
+  } catch (error) {
+    console.error("Erreur getProjectsByUser:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 
 // Récupère un projet via Git URL ou ZIP upload
 // POST /api/projects/fetch
@@ -8,8 +36,9 @@ const fetchProject = async (req, res) => {
   try {
     const { gitUrl } = req.body;
     const uploadedFile = req.file;
+    const userId = req.userId;
 
-    console.log("Fetch request - gitUrl:", gitUrl, "file:", !!uploadedFile);
+    console.log("Fetch request - gitUrl:", gitUrl, "file:", !!uploadedFile, "userId:", userId);
 
     // Cas 1: URL Git
     if (gitUrl) {
@@ -19,7 +48,7 @@ const fetchProject = async (req, res) => {
           error: "URL Git invalide" 
         });
       }
-      const projectInfo = await projectService.cloneGitRepository(gitUrl);
+      const projectInfo = await projectService.cloneGitRepository(gitUrl, userId);
       return res.status(201).json({
         success: true,
         message: "Projet Git cloné",
@@ -36,7 +65,7 @@ const fetchProject = async (req, res) => {
         });
       }
       
-      const projectInfo = await projectService.extractUploadedZip(uploadedFile.path, true);
+      const projectInfo = await projectService.extractUploadedZip(uploadedFile.path, true, userId);
       
       return res.status(201).json({
         success: true,
@@ -147,4 +176,5 @@ module.exports = {
   getProject,
   listProjects,
   deleteProject,
+  getProjectsByUser,
 };
