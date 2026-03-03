@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const authRoutes = require("./routes/authRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 
 const app = express();
@@ -13,7 +14,10 @@ app.get("/", (req, res) => {
   res.json({ message: "SecureScan API en cours !" });
 });
 
-// Routes pour la gestion des projets
+// Routes authentification
+app.use("/auth", authRoutes);
+
+// Routes projets
 app.use("/api/projects", projectRoutes);
 
 const PORT = process.env.PORT || 3000;
