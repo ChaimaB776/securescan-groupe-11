@@ -3,7 +3,6 @@ const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const { exec } = require("child_process");
 const { promisify } = require("util");
-const axios = require("axios");
 const unzipper = require("unzipper");
 const { detectProjectType, createProjectIndex } = require("../utils/projectHelper");
 
@@ -43,64 +42,13 @@ async function cloneGitRepository(gitUrl) {
   }
 }
 
-// Télécharge et extrait un fichier ZIP depuis une URL
-async function downloadAndExtractZip(zipUrl) {
-  try {
-    const projectId = uuidv4();
-    const projectPath = path.join(UPLOAD_DIR, projectId);
-    const zipPath = path.join(UPLOAD_DIR, `${projectId}.zip`);
 
-    console.log(`Téléchargement du ZIP: ${zipUrl}`);
-
-    // Télécharger le fichier ZIP
-    const response = await axios({
-      method: "get",
-      url: zipUrl,
-      responseType: "stream",
-    });
-
-    // Sauvegarder le fichier ZIP
-    await new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(zipPath);
-      response.data.pipe(writeStream);
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-    });
-
-    console.log(`Extraction du ZIP vers: ${projectPath}`);
-
-    // Créer le dossier de destination
-    fs.mkdirSync(projectPath, { recursive: true });
-
-    // Extraire le ZIP
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(zipPath)
-        .pipe(unzipper.Extract({ path: projectPath }))
-        .on("close", resolve)
-        .on("error", reject);
-    });
-
-    // Nettoyer le fichier ZIP
-    fs.unlinkSync(zipPath);
-
-    const projectInfo = {
-      id: projectId,
-      type: "zip",
-      source: zipUrl,
-      path: projectPath,
-      createdAt: new Date(),
-      projectType: detectProjectType(projectPath),
-      index: createProjectIndex(projectPath),
-    };
-
-    return projectInfo;
-  } catch (error) {
-    throw new Error(`Erreur téléchargement ZIP: ${error.message}`);
-  }
-}
-
-// Extrait un fichier ZIP uploadé
-async function extractUploadedZip(zipFile) {
+/**
+ * Extrait un fichier ZIP uploadé
+ * @param {string} zipFilePath - Chemin vers le fichier ZIP
+ * @param {boolean} isFromMulter - True si le fichier vient de multer
+ */
+async function extractUploadedZip(zipFilePath, isFromMulter = false) {
   try {
     const projectId = uuidv4();
     const projectPath = path.join(UPLOAD_DIR, projectId);
@@ -112,60 +60,46 @@ async function extractUploadedZip(zipFile) {
 
     // Extraire le ZIP
     await new Promise((resolve, reject) => {
-      zipFile
+      fs.createReadStream(zipFilePath)
         .pipe(unzipper.Extract({ path: projectPath }))
         .on("close", resolve)
         .on("error", reject);
     });
 
+    console.log(`ZIP extrait avec succès`);
+
+    // Nettoyer le fichier ZIP temporaire si vraiment nécessaire
+    if (!isFromMulter && fs.existsSync(zipFilePath)) {
+      try {
+        fs.unlinkSync(zipFilePath);
+      } catch (err) {
+        console.warn("Impossible de supprimer le fichier temporaire:", err.message);
+      }
+    }
+
+    // Retourner les infos
     const projectInfo = {
       id: projectId,
       type: "zip_upload",
       source: "uploaded_zip",
       path: projectPath,
       createdAt: new Date(),
-      projectType: detectProjectType(projectPath),
-      index: createProjectIndex(projectPath),
     };
+
+    // Indexation en background
+    setImmediate(() => {
+      try {
+        projectInfo.projectType = detectProjectType(projectPath);
+        projectInfo.index = createProjectIndex(projectPath);
+        console.log(`ZIP ${projectId} - Indexation terminée`);
+      } catch (err) {
+        console.warn(`Erreur indexation ZIP ${projectId}:`, err.message);
+      }
+    });
 
     return projectInfo;
   } catch (error) {
     throw new Error(`Erreur extraction ZIP: ${error.message}`);
-  }
-}
-
-// Crée un dossier depuis des fichiers uploadés
-async function createProjectFromUpload(files, projectName = null) {
-  try {
-    const projectId = uuidv4();
-    const projectPath = path.join(UPLOAD_DIR, projectId);
-
-    fs.mkdirSync(projectPath, { recursive: true });
-
-    // files contient les fichiers uploadés
-    if (Array.isArray(files)) {
-      for (const file of files) {
-        const filePath = path.join(projectPath, file.filename);
-        const dir = path.dirname(filePath);
-
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(filePath, file.data);
-      }
-    }
-
-    const projectInfo = {
-      id: projectId,
-      type: "upload",
-      source: projectName || "uploaded",
-      path: projectPath,
-      createdAt: new Date(),
-      projectType: detectProjectType(projectPath),
-      index: createProjectIndex(projectPath),
-    };
-
-    return projectInfo;
-  } catch (error) {
-    throw new Error(`Erreur création projet: ${error.message}`);
   }
 }
 
@@ -228,9 +162,7 @@ function listProjects() {
 
 module.exports = {
   cloneGitRepository,
-  downloadAndExtractZip,
   extractUploadedZip,
-  createProjectFromUpload,
   getProjectInfo,
   deleteProject,
   listProjects,

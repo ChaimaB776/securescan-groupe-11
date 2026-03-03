@@ -1,17 +1,17 @@
 const projectService = require("../services/projectService");
 
-  
-// Récupère un projet via Git URL, ZIP URL ou upload
+
+
+// Récupère un projet via Git URL ou ZIP upload
 // POST /api/projects/fetch
-  
 const fetchProject = async (req, res) => {
   try {
-    const { gitUrl, zipUrl } = req.body;
-    const uploadedFile = req.files?.project;
+    const { gitUrl } = req.body;
+    const uploadedFile = req.file;
 
-    console.log("Fetch request - gitUrl:", gitUrl, "zipUrl:", zipUrl, "file:", !!uploadedFile);
+    console.log("Fetch request - gitUrl:", gitUrl, "file:", !!uploadedFile);
 
-    // URL Git
+    // Cas 1: URL Git
     if (gitUrl) {
       if (!gitUrl.toLowerCase().includes("git")) {
         return res.status(400).json({ 
@@ -27,31 +27,17 @@ const fetchProject = async (req, res) => {
       });
     }
 
-    // URL ZIP
-    if (zipUrl) {
-      if (!zipUrl.toLowerCase().endsWith(".zip")) {
-        return res.status(400).json({ 
-          success: false,
-          error: "URL doit pointer vers un fichier .zip" 
-        });
-      }
-      const projectInfo = await projectService.downloadAndExtractZip(zipUrl);
-      return res.status(201).json({
-        success: true,
-        message: "ZIP téléchargé et extrait",
-        project: projectInfo,
-      });
-    }
-
-    // Fichier ZIP uploadé
+    // Cas 2: Fichier ZIP uploadé
     if (uploadedFile) {
-      if (!uploadedFile.name.toLowerCase().endsWith(".zip")) {
+      if (!uploadedFile.originalname.toLowerCase().endsWith(".zip")) {
         return res.status(400).json({ 
           success: false,
           error: "Fichier doit être un .zip" 
         });
       }
-      const projectInfo = await projectService.extractUploadedZip(uploadedFile.data);
+      
+      const projectInfo = await projectService.extractUploadedZip(uploadedFile.path, true);
+      
       return res.status(201).json({
         success: true,
         message: "ZIP uploadé et extrait",
@@ -61,41 +47,10 @@ const fetchProject = async (req, res) => {
 
     return res.status(400).json({
       success: false,
-      error: "Fournis: gitUrl, zipUrl ou un fichier .zip",
+      error: "Fournis: gitUrl ou un fichier .zip",
     });
   } catch (error) {
     console.error("Erreur fetchProject:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
-
-// Clone un repository Git
-// POST /api/projects/clone
-const cloneProject = async (req, res) => {
-  try {
-    const { gitUrl } = req.body;
-
-    if (!gitUrl) {
-      return res.status(400).json({ 
-        success: false,
-        error: "gitUrl est requis" 
-      });
-    }
-
-    console.log(`Clonage du repo: ${gitUrl}`);
-    const projectInfo = await projectService.cloneGitRepository(gitUrl);
-
-    res.status(201).json({
-      success: true,
-      message: "Projet cloné avec succès",
-      project: projectInfo,
-    });
-  } catch (error) {
-    console.error("Erreur cloneProject:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -189,7 +144,6 @@ const deleteProject = (req, res) => {
 
 module.exports = {
   fetchProject,
-  cloneProject,
   getProject,
   listProjects,
   deleteProject,
