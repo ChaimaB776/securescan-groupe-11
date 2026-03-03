@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion - SecureScan</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="background"></div>
+
+<div class="card">
+    <h1>🔐 SecureScan</h1>
+
+    <div class="tabs">
+        <button onclick="showLogin()" id="loginTab" class="active">Connexion</button>
+        <button onclick="showRegister()" id="registerTab">Inscription</button>
+    </div>
+
+    <div id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email">
+        <input type="password" id="loginPassword" placeholder="Mot de passe">
+        <button onclick="login()">Se connecter</button>
+    </div>
+
+    <div id="registerForm" style="display:none;">
+        <input type="email" id="registerEmail" placeholder="Email">
+        <input type="password" id="registerPassword" placeholder="Mot de passe">
+        <button onclick="register()">S'inscrire</button>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
