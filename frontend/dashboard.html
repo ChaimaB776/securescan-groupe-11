@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Résultats - SecureScan groupe 11</title>
+    <title>Résultats - SecureScan</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -10,7 +10,7 @@
 <div class="background"></div>
 
 <div class="card large">
-    <h1>📊 Résultats d'analyse</h1>
+    <h1>📊 Résultats</h1>
 
     <div class="score-container">
         <div class="score-bar">
@@ -20,15 +20,15 @@
     </div>
 
     <select id="filter" onchange="filterResults()">
-        <option value="all">Toutes les vulnérabilités</option>
-        <option value="High">🔴 High</option>
-        <option value="Medium">🟠 Medium</option>
-        <option value="Low">🟢 Low</option>
+        <option value="all">Toutes</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
     </select>
 
     <div id="results"></div>
 
-    <button onclick="goBack()">Nouvelle analyse</button>
+    <button onclick="logout()">Se déconnecter</button>
 </div>
 
 <script src="script.js"></script>
