@@ -2,26 +2,47 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>SecureScan</title>
+    <title>SecureScan - Analyse Projet</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="background"></div>
+    <div class="container">
 
-<div class="card">
-    <h1>🔍 Analyse de code</h1>
+        <h1>SecureScan</h1>
+        <p>Analyse de sécurité de projet</p>
 
-    <input type="text" id="gitLink" placeholder="Lien GitHub...">
+        <!-- ANALYSE GIT -->
+        <div class="card">
+            <h2>Analyser un projet Git</h2>
+            <input 
+                type="text" 
+                id="gitLink" 
+                placeholder="https://github.com/user/repository.git"
+            >
+        </div>
 
-    <div class="separator">OU</div>
+        <!-- UPLOAD ZIP -->
+        <div class="card">
+            <h2>Ou importer un fichier ZIP</h2>
+            <input 
+                type="file" 
+                id="zipFile" 
+                accept=".zip"
+            >
+        </div>
 
-    <textarea id="codeInput" placeholder="Collez votre code ici..."></textarea>
+        <button onclick="analyze()" class="btn-primary">
+            Analyser
+        </button>
 
-    <button onclick="analyze()">Analyser</button>
-    <button onclick="logout()">Se déconnecter</button>
-</div>
+        <!-- LOGOUT -->
+        <button onclick="logout()" class="btn-danger">
+            Déconnexion
+        </button>
 
-<script src="script.js"></script>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>

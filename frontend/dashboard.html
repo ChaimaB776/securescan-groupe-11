@@ -2,35 +2,36 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Résultats - SecureScan</title>
+    <title>SecureScan - Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="background"></div>
+    <div class="container">
 
-<div class="card large">
-    <h1>📊 Résultats</h1>
+        <div class="card large">
+            <h1>📊 Détails du projet</h1>
 
-    <div class="score-container">
-        <div class="score-bar">
-            <div id="scoreProgress"></div>
+            <div id="results">
+            </div>
+
+            <div class="actions">
+                <button onclick="deleteProject()">
+                    🗑 Supprimer le projet
+                </button>
+
+                <button class="secondary" onclick="window.location.href='index.html'">
+                    🔙 Retour
+                </button>
+
+                <button class="secondary" onclick="logout()">
+                    🚪 Se déconnecter
+                </button>
+            </div>
         </div>
-        <p>Score global : <span id="score">--</span>/100</p>
+
     </div>
 
-    <select id="filter" onchange="filterResults()">
-        <option value="all">Toutes</option>
-        <option value="High">High</option>
-        <option value="Medium">Medium</option>
-        <option value="Low">Low</option>
-    </select>
-
-    <div id="results"></div>
-
-    <button onclick="logout()">Se déconnecter</button>
-</div>
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

@@ -5,138 +5,124 @@
 }
 
 body {
-    font-family: 'Segoe UI', sans-serif;
-    height: 100vh;
-    background: #0f172a;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: white;
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    color: white;
 }
 
-.background {
-    position: fixed;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 20% 30%, #1e3a8a, transparent),
-                radial-gradient(circle at 80% 70%, #7c3aed, transparent);
-    z-index: -1;
+.container {
+    width: 90%;
+    max-width: 700px;
 }
 
 .card {
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(15px);
-    padding: 40px;
     border-radius: 20px;
-    width: 450px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
     text-align: center;
-    box-shadow: 0 0 30px rgba(0,0,0,0.4);
-    animation: fadeIn 0.8s ease-in-out;
+    animation: fadeIn 0.6s ease-in-out;
 }
 
-.large {
-    width: 650px;
+.card.large {
+    width: 100%;
 }
 
 h1 {
+    font-size: 28px;
     margin-bottom: 10px;
 }
 
-.subtitle {
-    margin-bottom: 25px;
+p {
     opacity: 0.8;
+    margin-bottom: 20px;
 }
 
-input, textarea, select {
+input {
     width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border-radius: 10px;
-    border: none;
-    outline: none;
-}
-
-textarea {
-    height: 120px;
-}
-
-.separator {
-    margin: 10px 0;
-    opacity: 0.6;
-}
-
-button {
-    width: 100%;
-    padding: 12px;
+    padding: 14px;
     margin-top: 15px;
     border-radius: 10px;
     border: none;
+    font-size: 14px;
+    outline: none;
+    transition: 0.3s;
+}
+
+input:focus {
+    box-shadow: 0 0 10px #00c6ff;
+}
+
+button {
+    margin-top: 15px;
+    padding: 14px;
+    width: 100%;
+    border-radius: 10px;
+    border: none;
     cursor: pointer;
-    background: linear-gradient(90deg, #2563eb, #7c3aed);
-    color: white;
     font-weight: bold;
+    font-size: 14px;
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    color: white;
     transition: 0.3s;
 }
 
 button:hover {
-    transform: scale(1.05);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 198, 255, 0.4);
 }
 
-.score-container {
-    margin: 20px 0;
+button.secondary {
+    background: rgba(255, 255, 255, 0.2);
 }
 
-.score-bar {
-    background: rgba(255,255,255,0.2);
-    border-radius: 20px;
-    height: 20px;
-    overflow: hidden;
+button.secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
-#scoreProgress {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #22c55e, #16a34a);
-    transition: width 1s ease-in-out;
+#results {
+    margin-top: 20px;
+    text-align: left;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    border-radius: 15px;
+    font-size: 14px;
+    line-height: 1.6;
 }
 
-.vuln {
-    padding: 12px;
-    margin: 8px 0;
-    border-radius: 10px;
-    font-weight: 500;
+#results p {
+    margin-bottom: 8px;
 }
 
-.High {
-    background: rgba(255, 0, 0, 0.3);
-}
-
-.Medium {
-    background: rgba(255, 165, 0, 0.3);
-}
-
-.Low {
-    background: rgba(0, 255, 0, 0.3);
+.actions {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px);}
-    to { opacity: 1; transform: translateY(0);}
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.tabs {
-    display: flex;
-    margin-bottom: 20px;
-}
+@media (max-width: 600px) {
+    .card {
+        padding: 25px;
+    }
 
-.tabs button {
-    flex: 1;
-    background: rgba(255,255,255,0.1);
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-}
-
-.tabs button.active {
-    background: linear-gradient(90deg, #2563eb, #7c3aed);
+    h1 {
+        font-size: 22px;
+    }
 }
