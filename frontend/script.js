@@ -76,6 +76,11 @@ function logout() {
     window.location.href = "login.html";
 }
 
+// aller sur la page profile utilisateur
+function goToProfile() {
+    window.location.href = "profile.html";
+}
+
 //  FETCH PROJECT (Git ou ZIP)
 async function analyze() {
 
@@ -247,6 +252,57 @@ async function refreshProjectData(projectId) {
 
 if (window.location.pathname.includes("dashboard.html")) {
     loadDashboard();
+}
+
+// Charge les projets d'un user
+async function loadUserProjects() {
+
+    const token = localStorage.getItem("token");
+
+    try {
+
+        const response = await fetch(`${API_URL}/api/projects`, {
+            headers: {
+                "Authorization": token
+            }
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            document.getElementById("projectsList").innerHTML = "Erreur chargement projets";
+            return;
+        }
+
+        const projects = data.projects;
+
+        if (!projects || projects.length === 0) {
+            document.getElementById("projectsList").innerHTML = "Aucun projet analysé.";
+            return;
+        }
+
+        let html = "<ul>";
+
+        projects.forEach(project => {
+            html += `
+                <li>
+                    <strong>${project.libelle_project || project.project_name}</strong>
+                    - ${project.createdAt}
+                    <button onclick="loadProject('${project.id}')">
+                        Voir
+                    </button>
+                </li>
+            `;
+        });
+
+        html += "</ul>";
+
+        document.getElementById("projectsList").innerHTML = html;
+
+    } catch (error) {
+        console.error(error);
+        document.getElementById("projectsList").innerHTML = "Erreur serveur.";
+    }
 }
 
 //  DELETE PROJECT
