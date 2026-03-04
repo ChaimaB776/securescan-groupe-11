@@ -18,6 +18,23 @@
   },
   "homepage": "https://github.com/ChaimaB776/securescan-groupe-11#readme",
   "dependencies": {
-    "express": "^5.2.1"
+    "eslint-plugin-security": "^4.0.0",
+    "express": "^5.2.1",
+    "external-editor": "^3.1.0",
+    "fs": "^0.0.1-security",
+    "inquirer": "^13.3.0",
+    "koa": "^3.1.2",
+    "multer": "^2.1.0",
+    "mysql2": "^3.18.2",
+    "path": "^0.12.7",
+    "simple-git": "^3.32.3",
+    "tmp": "^0.2.5",
+    "unzipper": "^0.12.3",
+    "util": "^0.12.5",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.0.2",
+    "semgrep": "^0.0.1"
   }
 }
