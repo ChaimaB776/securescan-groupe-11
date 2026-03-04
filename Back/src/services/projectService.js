@@ -18,7 +18,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 
 // Clone un repository Git
-async function cloneGitRepository(gitUrl, userId) {
+async function cloneGitRepository(gitUrl, userId, libelle_project) {
   try {
     const projectId = uuidv4();
     const projectPath = path.join(UPLOAD_DIR, projectId);
@@ -34,9 +34,9 @@ async function cloneGitRepository(gitUrl, userId) {
     if (userId) {
       const connection = await pool.getConnection();
       await connection.query(
-        `INSERT INTO scans (user_id, project_name, results, score) 
-         VALUES (?, ?, ?, ?)`,
-        [userId, gitUrl, JSON.stringify({ 
+        `INSERT INTO scans (user_id, project_name, libelle_project, results, score) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [userId, gitUrl, libelle_project, JSON.stringify({ 
           id: projectId, 
           type: 'git', 
           fileCount, 
@@ -49,7 +49,8 @@ async function cloneGitRepository(gitUrl, userId) {
     const projectInfo = {
       id: projectId,
       type: "git",
-      source: gitUrl,
+      project_name: gitUrl,
+      libelle_project: libelle_project,
       path: projectPath,
       fileCount: fileCount,
       createdAt: new Date(),
@@ -64,13 +65,8 @@ async function cloneGitRepository(gitUrl, userId) {
 }
 
 
-/**
- * Extrait un fichier ZIP uploadé
- * @param {string} zipFilePath - Chemin vers le fichier ZIP
- * @param {boolean} isFromMulter - True si le fichier vient de multer
- * @param {number} userId - ID utilisateur
- */
-function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null) {
+// Extrait un fichier ZIP uploadé
+function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, libelle_project = null) {
   return new Promise((resolveMain) => {
     const projectId = uuidv4();
     const projectPath = path.join(UPLOAD_DIR, projectId);
@@ -84,7 +80,8 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null) {
     const projectInfo = {
       id: projectId,
       type: "zip_upload",
-      source: "uploaded_zip",
+      project_name: `ZIP-${projectId}`,
+      libelle_project: libelle_project,
       path: projectPath,
       fileCount: 0,
       createdAt: new Date(),
@@ -95,11 +92,11 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null) {
       pool.getConnection().then(async (connection) => {
         try {
           await connection.query(
-            `INSERT INTO scans (user_id, project_name, results, score) 
-             VALUES (?, ?, ?, ?)`,
-            [userId, `ZIP-${projectId}`, JSON.stringify({ 
+            `INSERT INTO scans (user_id, project_name, libelle_project, results, score) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [userId, `ZIP-${projectId}`, libelle_project, JSON.stringify({ 
               id: projectId, 
-              type: 'zip_upload', 
+              type: 'zip_upload',
               fileCount: 0
             }), 0]
           );
@@ -248,6 +245,8 @@ async function getProjectsByUserId(userId) {
       return {
         id: results.id,
         type: results.type,
+        project_name: row.project_name,
+        libelle_project: row.libelle_project,
         fileCount: results.fileCount,
         projectType: results.projectType,
         score: row.score,
