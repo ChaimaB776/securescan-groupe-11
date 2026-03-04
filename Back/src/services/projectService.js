@@ -6,6 +6,8 @@ const { promisify } = require("util");
 const unzipper = require("unzipper");
 const { detectProjectType, createProjectIndex, countFiles } = require("../utils/projectHelper");
 const pool = require("../config/database");
+const scanService = require("./scanService");
+const { mapToOWASP } = require("../utils/owaspMapper");
 
 const execPromise = promisify(exec);
 
@@ -14,6 +16,73 @@ const UPLOAD_DIR = path.join(__dirname, "../../uploads");
 // Créer le répertoire uploads s'il n'existe pas
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+/**
+ * Lance les scans en background et met à jour la BDD
+ * @param {string} projectId - ID du projet
+ * @param {string} projectPath - Chemin du projet
+ * @param {number} userId - ID utilisateur
+ * @param {string} sourceType - Type de source: 'git' ou 'zip'
+ */
+async function runScansInBackground(projectId, projectPath, userId, sourceType = 'git') {
+  try {
+    console.log(`\n[SCAN] Démarrage des scans pour ${projectId} (${sourceType})`);
+    
+    // Lancer tous les scanners (TruffleHog seulement si Git)
+    const vulnerabilities = await scanService.scanProject(projectPath, sourceType);
+    
+    // Ajouter le mapping OWASP à chaque vulnérabilité
+    const vulnsWithOWASP = vulnerabilities.map(vuln => ({
+      ...vuln,
+      owasp: mapToOWASP(vuln.title, vuln.tool)
+    }));
+    
+    // Calculer le score
+    const score = scanService.calculateScore(vulnsWithOWASP);
+    
+    console.log(`[SCAN] Résultats: ${vulnsWithOWASP.length} vulnérabilité(s), Score: ${score}/100`);
+    
+    // Mettre à jour la BDD
+    if (userId) {
+      const connection = await pool.getConnection();
+      
+      // D'abord récupérer les données actuelles pour préserver les champs
+      const [existingRows] = await connection.query(
+        `SELECT results FROM scans 
+         WHERE user_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(results, '$.id')) = ?`,
+        [userId, projectId]
+      );
+      
+      let resultsStructure = {
+        id: projectId,
+        vulnerabilities: vulnsWithOWASP
+      };
+      
+      // Fusionner avec les données existantes pour préserver type, fileCount, projectType
+      if (existingRows.length > 0) {
+        const existingData = typeof existingRows[0].results === 'string' 
+          ? JSON.parse(existingRows[0].results) 
+          : existingRows[0].results;
+        
+        resultsStructure = {
+          ...existingData,
+          id: projectId,
+          vulnerabilities: vulnsWithOWASP
+        };
+      }
+      
+      await connection.query(
+        `UPDATE scans SET results = ?, score = ? 
+         WHERE user_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(results, '$.id')) = ?`,
+        [JSON.stringify(resultsStructure), score, userId, projectId]
+      );
+      connection.release();
+      console.log(`[SCAN] Résultats sauvegardés en BDD`);
+    }
+  } catch (err) {
+    console.error(`[SCAN ERROR] ${err.message}`);
+  }
 }
 
 
@@ -57,6 +126,11 @@ async function cloneGitRepository(gitUrl, userId, libelle_project) {
       projectType: projectType,
       index: createProjectIndex(projectPath),
     };
+
+    // Lancer les scans en background (ne pas bloquer la réponse)
+    setImmediate(() => {
+      runScansInBackground(projectId, projectPath, userId, 'git');
+    });
 
     return projectInfo;
   } catch (error) {
@@ -141,6 +215,9 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, li
                 }
               });
             }
+
+            // Lancer les scans en background
+            runScansInBackground(projectId, projectPath, userId, 'zip');
           } catch (err) {
             console.warn(`Erreur indexation ZIP ${projectId}:`, err.message);
           }

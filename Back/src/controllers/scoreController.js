@@ -92,12 +92,15 @@ const getScore = async (req, res) => {
     }
 
     const scan = rows[0];
-    const results = typeof scan.results === 'string' ? JSON.parse(scan.results) : scan.results;
+    const resultsData = typeof scan.results === 'string' ? JSON.parse(scan.results) : scan.results;
+    
+    // Les résultats sont structurés comme {id: ..., vulnerabilities: [...]}
+    const vulnerabilities = resultsData.vulnerabilities || resultsData || [];
 
     res.json({
       success: true,
       score: scan.score,
-      results,
+      results: vulnerabilities,
     });
   } catch (error) {
     console.error("Erreur getScore:", error);
