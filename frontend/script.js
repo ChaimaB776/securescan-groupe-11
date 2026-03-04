@@ -172,6 +172,25 @@ function loadDashboard() {
         <p><strong>Créé le :</strong> ${project.createdAt || "N/A"}</p>
     `;
 
+    // === AJOUT OWASP ===
+    if (project.index && project.index.owaspCategories) {
+
+        let owaspHtml = `<hr><h2>📂 Tri OWASP</h2><ul>`;
+
+        for (let category in project.index.owaspCategories) {
+            owaspHtml += `
+                <li>
+                    <strong>${category}</strong> :
+                    ${project.index.owaspCategories[category]} vulnérabilité(s)
+                </li>
+            `;
+        }
+
+        owaspHtml += "</ul>";
+
+        resultsDiv.innerHTML += owaspHtml;
+    }
+
     // Si c'est un ZIP et fileCount est 0 ou undefined, rafraîchir après quelques secondes
     if (project.type === "zip_upload" && (!project.fileCount || project.fileCount === 0)) {
         const projectId = localStorage.getItem("projectId");
@@ -198,12 +217,17 @@ async function refreshProjectData(projectId) {
         const data = await response.json();
 
         if (data.success) {
-            // Mettre à jour SEULEMENT le fileCount dans le localStorage et l'affichage
+
             const savedProject = JSON.parse(localStorage.getItem("projectData"));
             savedProject.fileCount = data.project.fileCount;
+
+            // === AJOUT OWASP REFRESH ===
+            if (data.project.index && data.project.index.owaspCategories) {
+                savedProject.index = data.project.index;
+            }
+
             localStorage.setItem("projectData", JSON.stringify(savedProject));
             
-            // Mettre à jour que le nombre de fichiers dans le DOM
             const fileCountElements = document.querySelectorAll("strong");
             for (let el of fileCountElements) {
                 if (el.textContent === "Nombre fichiers :") {
@@ -212,7 +236,11 @@ async function refreshProjectData(projectId) {
                 }
             }
             
-            // Si fileCount est toujours 0, continuer le refresh
+            // Recharge dashboard si OWASP dispo
+            if (savedProject.index && savedProject.index.owaspCategories) {
+                loadDashboard();
+            }
+
             if (data.project.fileCount === 0) {
                 setTimeout(() => {
                     refreshProjectData(projectId);

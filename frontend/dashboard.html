@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>SecureScan - Dashboard</title>
+    <title>SecureScan - Résultats Analyse</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -10,10 +10,16 @@
     <div class="container">
 
         <div class="card large">
-            <h1>📊 Détails du projet</h1>
+            <h1>📊 Résultats de l'analyse sécurité</h1>
 
-            <div id="results">
-            </div>
+            <!-- Résumé global -->
+            <div id="summary"></div>
+
+            <!-- Score global -->
+            <div id="score"></div>
+
+            <!-- Résultats détaillés -->
+            <div id="results"></div>
 
             <div class="actions">
                 <button onclick="deleteProject()">
