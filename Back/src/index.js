@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const projectRoutes = require("./routes/projectRoutes");
+const scoreRoutes = require("./routes/scoreRoutes");
 
 const app = express();
 
@@ -28,6 +29,9 @@ app.use("/auth", authRoutes);
 
 // Routes projets
 app.use("/api/projects", projectRoutes);
+
+// Routes score
+app.use("/api/score", scoreRoutes);
 
 const PORT = process.env.PORT || 3000;
 
