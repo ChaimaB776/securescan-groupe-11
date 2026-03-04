@@ -4,7 +4,8 @@ const { v4: uuidv4 } = require("uuid");
 const { exec } = require("child_process");
 const { promisify } = require("util");
 const unzipper = require("unzipper");
-const { detectProjectType, createProjectIndex } = require("../utils/projectHelper");
+const { detectProjectType, createProjectIndex, countFiles } = require("../utils/projectHelper");
+const pool = require("../config/database");
 
 const execPromise = promisify(exec);
 
@@ -17,7 +18,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 
 // Clone un repository Git
-async function cloneGitRepository(gitUrl) {
+async function cloneGitRepository(gitUrl, userId) {
   try {
     const projectId = uuidv4();
     const projectPath = path.join(UPLOAD_DIR, projectId);
@@ -26,13 +27,33 @@ async function cloneGitRepository(gitUrl) {
 
     await execPromise(`git clone ${gitUrl} ${projectPath}`);
 
+    const fileCount = countFiles(projectPath);
+    const projectType = detectProjectType(projectPath);
+
+    // Sauvegarder en BDD
+    if (userId) {
+      const connection = await pool.getConnection();
+      await connection.query(
+        `INSERT INTO scans (user_id, project_name, results, score) 
+         VALUES (?, ?, ?, ?)`,
+        [userId, gitUrl, JSON.stringify({ 
+          id: projectId, 
+          type: 'git', 
+          fileCount, 
+          projectType 
+        }), 0]
+      );
+      connection.release();
+    }
+
     const projectInfo = {
       id: projectId,
       type: "git",
       source: gitUrl,
       path: projectPath,
+      fileCount: fileCount,
       createdAt: new Date(),
-      projectType: detectProjectType(projectPath),
+      projectType: projectType,
       index: createProjectIndex(projectPath),
     };
 
@@ -47,9 +68,10 @@ async function cloneGitRepository(gitUrl) {
  * Extrait un fichier ZIP uploadé
  * @param {string} zipFilePath - Chemin vers le fichier ZIP
  * @param {boolean} isFromMulter - True si le fichier vient de multer
+ * @param {number} userId - ID utilisateur
  */
-async function extractUploadedZip(zipFilePath, isFromMulter = false) {
-  try {
+function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null) {
+  return new Promise((resolveMain) => {
     const projectId = uuidv4();
     const projectPath = path.join(UPLOAD_DIR, projectId);
 
@@ -58,49 +80,89 @@ async function extractUploadedZip(zipFilePath, isFromMulter = false) {
     // Créer le dossier de destination
     fs.mkdirSync(projectPath, { recursive: true });
 
-    // Extraire le ZIP
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(zipFilePath)
-        .pipe(unzipper.Extract({ path: projectPath }))
-        .on("close", resolve)
-        .on("error", reject);
-    });
-
-    console.log(`ZIP extrait avec succès`);
-
-    // Nettoyer le fichier ZIP temporaire si vraiment nécessaire
-    if (!isFromMulter && fs.existsSync(zipFilePath)) {
-      try {
-        fs.unlinkSync(zipFilePath);
-      } catch (err) {
-        console.warn("Impossible de supprimer le fichier temporaire:", err.message);
-      }
-    }
-
-    // Retourner les infos
+    // Retourner immédiatement les infos basiques
     const projectInfo = {
       id: projectId,
       type: "zip_upload",
       source: "uploaded_zip",
       path: projectPath,
+      fileCount: 0,
       createdAt: new Date(),
     };
 
-    // Indexation en background
-    setImmediate(() => {
-      try {
-        projectInfo.projectType = detectProjectType(projectPath);
-        projectInfo.index = createProjectIndex(projectPath);
-        console.log(`ZIP ${projectId} - Indexation terminée`);
-      } catch (err) {
-        console.warn(`Erreur indexation ZIP ${projectId}:`, err.message);
-      }
-    });
+    // Sauvegarder en BDD immédiatement
+    if (userId) {
+      pool.getConnection().then(async (connection) => {
+        try {
+          await connection.query(
+            `INSERT INTO scans (user_id, project_name, results, score) 
+             VALUES (?, ?, ?, ?)`,
+            [userId, `ZIP-${projectId}`, JSON.stringify({ 
+              id: projectId, 
+              type: 'zip_upload', 
+              fileCount: 0
+            }), 0]
+          );
+        } catch (err) {
+          console.error("Erreur sauvegarde en BDD:", err.message);
+        } finally {
+          connection.release();
+        }
+      });
+    }
 
-    return projectInfo;
-  } catch (error) {
-    throw new Error(`Erreur extraction ZIP: ${error.message}`);
-  }
+    resolveMain(projectInfo);
+
+    // Extraction en vrai background
+    setImmediate(() => {
+      fs.createReadStream(zipFilePath)
+        .pipe(unzipper.Extract({ path: projectPath }))
+        .on("close", () => {
+          console.log(`ZIP ${projectId} extrait avec succès`);
+          
+          // Indexation après extraction
+          try {
+            const fileCount = countFiles(projectPath);
+            projectInfo.projectType = detectProjectType(projectPath);
+            projectInfo.index = createProjectIndex(projectPath);
+            projectInfo.fileCount = fileCount;
+            console.log(`ZIP ${projectId} - Indexation terminée (${fileCount} fichiers)`);
+
+            // Mettre à jour la BDD avec les infos finales
+            if (userId) {
+              pool.getConnection().then(async (connection) => {
+                try {
+                  await connection.query(
+                    `UPDATE scans SET results = ? WHERE user_id = ? 
+                     AND JSON_EXTRACT(results, '$.id') = ?`,
+                    [JSON.stringify(projectInfo), userId, projectId]
+                  );
+                } catch (err) {
+                  console.error("Erreur update BDD:", err.message);
+                } finally {
+                  connection.release();
+                }
+              });
+            }
+          } catch (err) {
+            console.warn(`Erreur indexation ZIP ${projectId}:`, err.message);
+          }
+
+          // Nettoyer le fichier ZIP temporaire après extraction
+          if (!isFromMulter && fs.existsSync(zipFilePath)) {
+            try {
+              fs.unlinkSync(zipFilePath);
+              console.log(`Fichier ZIP ${projectId} supprimé`);
+            } catch (err) {
+              console.warn("Impossible de supprimer le fichier temporaire:", err.message);
+            }
+          }
+        })
+        .on("error", (err) => {
+          console.error(`Erreur extraction ZIP ${projectId}:`, err.message);
+        });
+    });
+  });
 }
 
 // Récupère les infos d'un projet existant
@@ -112,10 +174,18 @@ function getProjectInfo(projectId) {
       throw new Error(`Projet ${projectId} non trouvé`);
     }
 
+    // Déterminer le type: Git si .git existe, sinon ZIP
+    const hasGitFolder = fs.existsSync(path.join(projectPath, ".git"));
+    const projectType = detectProjectType(projectPath);
+    const stats = fs.statSync(projectPath);
+
     return {
       id: projectId,
+      type: hasGitFolder ? "git" : "zip_upload",
       path: projectPath,
-      projectType: detectProjectType(projectPath),
+      fileCount: countFiles(projectPath),
+      projectType: projectType,
+      createdAt: stats.birthtime,
       index: createProjectIndex(projectPath),
     };
   } catch (error) {
@@ -150,6 +220,7 @@ function listProjects() {
       return {
         id,
         path: projectPath,
+        fileCount: countFiles(projectPath),
         createdAt: fs.statSync(projectPath).birthtime,
       };
     });
@@ -160,12 +231,41 @@ function listProjects() {
   }
 }
 
+// Récupère les projets d'un utilisateur
+async function getProjectsByUserId(userId) {
+  try {
+    const connection = await pool.getConnection();
+    
+    const [rows] = await connection.query(
+      "SELECT * FROM scans WHERE user_id = ? ORDER BY created_at DESC",
+      [userId]
+    );
+    
+    connection.release();
+
+    return rows.map((row) => {
+      const results = typeof row.results === 'string' ? JSON.parse(row.results) : row.results;
+      return {
+        id: results.id,
+        type: results.type,
+        fileCount: results.fileCount,
+        projectType: results.projectType,
+        score: row.score,
+        createdAt: row.created_at,
+      };
+    });
+  } catch (error) {
+    console.error("❌ Erreur récupération projets utilisateur:", error.message);
+    return [];
+  }
+}
+
 module.exports = {
   cloneGitRepository,
   extractUploadedZip,
   getProjectInfo,
   deleteProject,
   listProjects,
+  getProjectsByUserId,
   UPLOAD_DIR,
 };
-
