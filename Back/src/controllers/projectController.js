@@ -167,9 +167,10 @@ const listProjects = async (req, res) => {
 
 // Supprime un projet du cache
 // DELETE /api/projects/:projectId
-const deleteProject = (req, res) => {
+const deleteProject = async (req, res) => {
   try {
     const { projectId } = req.params;
+    const userId = req.userId;
 
     if (!projectId) {
       return res.status(400).json({ 
@@ -178,7 +179,7 @@ const deleteProject = (req, res) => {
       });
     }
 
-    const deleted = projectService.deleteProject(projectId);
+    const deleted = await projectService.deleteProject(projectId, userId);
 
     if (deleted) {
       res.json({

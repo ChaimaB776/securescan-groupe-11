@@ -273,14 +273,57 @@ function getProjectInfo(projectId) {
 }
 
 // Supprime un projet (nettoyage)
-function deleteProject(projectId) {
+async function deleteProject(projectId, userId) {
   try {
-    const projectPath = path.join(UPLOAD_DIR, projectId);
-
-    if (fs.existsSync(projectPath)) {
-      fs.rmSync(projectPath, { recursive: true, force: true });
-      return true;
+    if (userId) {
+      const connection = await pool.getConnection();
+      try {
+        // D'abord récupérer les données du projet pour avoir l'UUID
+        const [projectRows] = await connection.query(
+          `SELECT results FROM scans WHERE id = ? AND user_id = ?`,
+          [projectId, userId]
+        );
+        
+        if (projectRows.length === 0) {
+          connection.release();
+          return false; // Projet non trouvé ou utilisateur n'est pas propriétaire
+        }
+        
+        // Extraire l'UUID depuis le JSON
+        let projectUuid = null;
+        const projectData = projectRows[0].results;
+        if (projectData) {
+          const data = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+          projectUuid = data.id;
+        }
+        
+        // Supprimer de la BDD
+        const [result] = await connection.query(
+          `DELETE FROM scans WHERE id = ? AND user_id = ?`,
+          [projectId, userId]
+        );
+        connection.release();
+        
+        if (result.affectedRows === 0) {
+          return false;
+        }
+        
+        // Supprimer le dossier du disque si UUID trouvé
+        if (projectUuid) {
+          const projectPath = path.join(UPLOAD_DIR, projectUuid);
+          if (fs.existsSync(projectPath)) {
+            fs.rmSync(projectPath, { recursive: true, force: true });
+            console.log(`📁 Dossier supprimé: ${projectPath}`);
+          }
+        }
+        
+        return true;
+      } catch (err) {
+        connection.release();
+        throw err;
+      }
     }
+    
     return false;
   } catch (error) {
     throw new Error(`Erreur suppression projet: ${error.message}`);
