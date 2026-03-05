@@ -51,19 +51,8 @@ async function runESLint(projectPath) {
   try {
     console.log("🔍 Lancement ESLint...");
     
-    // D'abord vérifier s'il y a des fichiers JS
-    const jsFiles = await execAsync(
-      `cd "${projectPath}" && find . -name "*.js" -type f 2>/dev/null | head -1`,
-      { maxBuffer: 1024 * 1024, timeout: 10000, shell: true }
-    );
-    
-    if (!jsFiles.stdout.trim()) {
-      console.log("⚠️ ESLint: pas de fichiers JavaScript trouvés");
-      return vulnerabilities;
-    }
-    
     const { stdout } = await execAsync(
-      `cd "${projectPath}" && npx eslint --format json . 2>/dev/null || echo "[]"`,
+      `cd "${projectPath}" && npx eslint --format json . 2>&1 || echo "[]"`,
       { maxBuffer: 10 * 1024 * 1024, timeout: 60000, shell: true }
     );
 
