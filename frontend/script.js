@@ -161,6 +161,7 @@ async function loadProject(projectId) {
     }
 
     localStorage.setItem("projectData", JSON.stringify(data.project));
+    localStorage.setItem("projectId", projectId);
     window.location.href = "dashboard.html";
 }
 
@@ -258,15 +259,18 @@ async function loadScanResults(projectId) {
     const token = localStorage.getItem("token");
     let attempts = 0;
     const maxAttempts = 120;
-    const pollInterval = 1000; // 1 seconde
+    const pollInterval = 2000; // 2 secondes (au lieu de 1)
     
     // Afficher le loader
     const loading = document.getElementById("loading");
     if (loading) loading.style.display = "flex";
 
     return new Promise((resolve) => {
-        const pollTimer = setInterval(async () => {
-            attempts++;
+        // Attendre 3 secondes avant de commencer le polling
+        // (les scanners ont besoin de temps pour démarrer)
+        setTimeout(() => {
+            const pollTimer = setInterval(async () => {
+                attempts++;
 
             try {
                 const response = await fetch(
@@ -311,6 +315,7 @@ async function loadScanResults(projectId) {
                 }
             }
         }, pollInterval);
+        }, 3000); // Attendre 3s avant de commencer le polling
     });
 }
 
@@ -384,11 +389,19 @@ function displayScanResults(score, vulnerabilities) {
 
     // === LISTES DES VULNÉRABILITÉS ===
     let vulnHtml = `<div class="vulnerabilities-list">`;
-    vulnHtml += `<h3>🔍 Vulnérabilités détectées (${vulnerabilities.length})</h3>`;
-
+    
     if (vulnerabilities.length === 0) {
         vulnHtml += `<div class="no-vulnerabilities">✅ Aucune vulnérabilité détectée!</div>`;
     } else {
+        // En-tête principal avec toggle
+        vulnHtml += `
+            <div class="accordion-header" id="mainAccordion">
+                <span>🔍 Vulnérabilités détectées (${vulnerabilities.length})</span>
+                <span class="accordion-toggle" id="mainToggle">▼</span>
+            </div>
+            <div class="accordion-content expanded" id="mainContent">
+        `;
+        
         const vulnsBySeverity = {
             CRITICAL: [],
             HIGH: [],
@@ -404,9 +417,14 @@ function displayScanResults(score, vulnerabilities) {
 
         ["CRITICAL", "HIGH", "MEDIUM", "LOW"].forEach(severity => {
             if (vulnsBySeverity[severity].length > 0) {
-                vulnHtml += `<h4 style="margin-top: 20px; margin-bottom: 10px; color: #2c3e50; border-bottom: 2px solid #bdc3c7; padding-bottom: 8px;">
-                    ${severity} (${vulnsBySeverity[severity].length})
-                </h4>`;
+                const severityId = `severity-${severity}`;
+                vulnHtml += `
+                    <div class="severity-group-header" onclick="toggleSeverity('${severityId}')">
+                        <span>${severity} (${vulnsBySeverity[severity].length})</span>
+                        <span class="severity-toggle" id="${severityId}-toggle">▼</span>
+                    </div>
+                    <div class="severity-content expanded" id="${severityId}">
+                `;
 
                 vulnsBySeverity[severity].forEach(vuln => {
                     const vulnClass = `vuln-${severity.toLowerCase()}`;
@@ -415,22 +433,22 @@ function displayScanResults(score, vulnerabilities) {
                     // Gérer le cas où le fichier est inconnu
                     const fileDisplay = vuln.file === 'unknown' || !vuln.file 
                         ? '❓ Emplacement non identifié' 
-                        : `<code style="background-color: #ecf0f1; padding: 2px 6px; border-radius: 3px;">${vuln.file}</code>`;
+                        : `<code style="background-color: #1a252f; padding: 2px 6px; border-radius: 3px; color: #f39c12;">${vuln.file}</code>`;
                     
                     const lineDisplay = vuln.line === 0 || !vuln.line ? '' : ` (ligne ${vuln.line})`;
 
                     vulnHtml += `
                         <div class="vulnerability-item ${vulnClass}">
-                            <strong style="font-size: 16px; color: #2c3e50;">${vuln.title}</strong>
+                            <strong style="font-size: 16px; color: white;">${vuln.title}</strong>
                             <div class="vuln-details">
                                 <span class="vuln-badge ${badgeClass}">${vuln.severity}</span>
                                 <span class="vuln-badge" style="background-color: #34495e; color: white;">${vuln.tool}</span>
                                 ${vuln.owasp ? `<span class="vuln-badge" style="background-color: #8e44ad; color: white;">${vuln.owasp}</span>` : ''}
                                 <br><br>
-                                <div style="margin-bottom: 8px;"><strong>📄 Fichier:</strong> ${fileDisplay}${lineDisplay}</div>
-                                <div style="background-color: #fafafa; padding: 12px; border-radius: 4px; border-left: 3px solid #34495e; margin-top: 8px;">
-                                    <strong>📝 Détails:</strong>
-                                    <div style="color: #34495e; white-space: pre-wrap; font-family: monospace; font-size: 13px; margin-top: 6px;">
+                                <div style="margin-bottom: 8px; color: white;"><strong>📄 Fichier:</strong> ${fileDisplay}${lineDisplay}</div>
+                                <div style="background-color: #1a252f; padding: 12px; border-radius: 4px; border-left: 3px solid #f39c12; margin-top: 8px;">
+                                    <strong style="color: white;">📝 Détails:</strong>
+                                    <div style="color: #ecf0f1; white-space: pre-wrap; font-family: monospace; font-size: 13px; margin-top: 6px;">
 ${vuln.description || "N/A"}
                                     </div>
                                 </div>
@@ -438,13 +456,31 @@ ${vuln.description || "N/A"}
                         </div>
                     `;
                 });
+                
+                vulnHtml += `</div>`; // Fermer severity-content
             }
         });
+        
+        vulnHtml += `</div>`; // Fermer mainContent
     }
 
     vulnHtml += `</div>`;
 
     resultsDiv.innerHTML = statsHtml + vulnHtml;
+    
+    // === ATTACHER LES ÉVÉNEMENTS ACCORDÉON ===
+    const mainAccordion = document.getElementById("mainAccordion");
+    const mainToggle = document.getElementById("mainToggle");
+    const mainContent = document.getElementById("mainContent");
+    
+    if (mainAccordion) {
+        mainAccordion.addEventListener("click", function() {
+            const isExpanded = mainContent.classList.contains("expanded");
+            mainContent.classList.toggle("expanded");
+            mainToggle.classList.toggle("expanded");
+            mainAccordion.classList.toggle("expanded");
+        });
+    }
 }
 
 if (window.location.pathname.includes("dashboard.html")) {
@@ -455,6 +491,19 @@ if (window.location.pathname.includes("dashboard.html")) {
         loadScanResults(projectId);
     } else {
         console.log("[DEBUG] Pas de projectId trouvé");
+    }
+}
+
+// TOGGLE POUR LES GROUPES DE SÉVÉRITÉ
+function toggleSeverity(severityId) {
+    const content = document.getElementById(severityId);
+    const toggle = document.getElementById(severityId + "-toggle");
+    const header = toggle.closest(".severity-group-header");
+    
+    if (content) {
+        content.classList.toggle("expanded");
+        toggle.classList.toggle("expanded");
+        header.classList.toggle("expanded");
     }
 }
 
@@ -493,7 +542,10 @@ async function loadUserProjects() {
                     <strong>${project.libelle_project || project.project_name}</strong>
                     - ${project.createdAt}
                     <button onclick="loadProject('${project.id}')">
-                        Voir
+                        👁️ Voir
+                    </button>
+                    <button onclick="downloadProjectPDF('${project.id}')" class="secondary">
+                        📄 Télécharger PDF
                     </button>
                 </li>
             `;
@@ -540,4 +592,46 @@ async function deleteProject() {
     localStorage.removeItem("projectId");
 
     window.location.href = "index.html";
+}
+
+// TÉLÉCHARGER PDF DU RAPPORT
+async function downloadProjectPDF(projectId) {
+    const token = localStorage.getItem("token");
+
+    if (!token || !projectId) {
+        alert("Erreur: ID projet manquant");
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `${API_URL}/api/projects/${projectId}/pdf/download`,
+            {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            const data = await response.json();
+            alert(data.error || "Erreur téléchargement PDF");
+            return;
+        }
+
+        // Créer un blob et télécharger
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `SecureScan-Report.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+    } catch (error) {
+        console.error("Erreur téléchargement PDF:", error);
+        alert("Erreur lors du téléchargement");
+    }
 }

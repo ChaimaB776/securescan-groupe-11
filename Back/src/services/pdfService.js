@@ -31,7 +31,7 @@ async function generatePDF(projectName, score, vulnerabilities) {
 
     // Score
     doc.fontSize(18).font('Helvetica-Bold').text(`Score: ${score}/100`);
-    const scoreStatus = score >= 90 ? '✅ Excellent' : score >= 70 ? '⚠️ Bon' : score >= 50 ? '⚠️ Moyen' : '❌ Faible';
+    const scoreStatus = score >= 90 ? 'EXCELLENT' : score >= 70 ? 'BON' : score >= 50 ? 'MOYEN' : 'FAIBLE';
     doc.fontSize(12).text(`Statut: ${scoreStatus}`);
     doc.moveDown(2);
 
@@ -46,16 +46,16 @@ async function generatePDF(projectName, score, vulnerabilities) {
 
     doc.fontSize(14).font('Helvetica-Bold').text('Statistiques');
     doc.fontSize(11).font('Helvetica');
-    doc.text(`Total: ${stats.TOTAL} vulnérabilités`);
-    doc.text(`  🔴 CRITICAL: ${stats.CRITICAL}`);
-    doc.text(`  🔴 HIGH: ${stats.HIGH}`);
-    doc.text(`  🟡 MEDIUM: ${stats.MEDIUM}`);
-    doc.text(`  🟢 LOW: ${stats.LOW}`);
+    doc.text(`Total: ${stats.TOTAL} vulnerabilites`);
+    doc.text(`- CRITICAL: ${stats.CRITICAL}`);
+    doc.text(`- HIGH: ${stats.HIGH}`);
+    doc.text(`- MEDIUM: ${stats.MEDIUM}`);
+    doc.text(`- LOW: ${stats.LOW}`);
     doc.moveDown(2);
 
     // Détails des vulnérabilités
     if (vulnerabilities.length > 0) {
-      doc.fontSize(14).font('Helvetica-Bold').text('Vulnérabilités');
+      doc.fontSize(14).font('Helvetica-Bold').text('Vulnerabilites');
       doc.moveDown(1);
 
       vulnerabilities.forEach((vuln, idx) => {
@@ -69,12 +69,12 @@ async function generatePDF(projectName, score, vulnerabilities) {
         doc.moveDown(0.5);
       });
     } else {
-      doc.fontSize(12).font('Helvetica').text('✅ Aucune vulnérabilité');
+      doc.fontSize(12).font('Helvetica').text('OK - Aucune vulnerabilite');
     }
 
     // Pied de page
     doc.moveDown(2);
-    doc.fontSize(9).text(`Généré par SecureScan - ${new Date().toLocaleString('fr-FR')}`);
+    doc.fontSize(9).text(`Genere par SecureScan - ${new Date().toLocaleString('fr-FR')}`);
 
     doc.end();
 

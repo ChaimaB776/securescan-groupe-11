@@ -53,9 +53,8 @@ async function runScansInBackground(projectId, projectPath, userId, sourceType =
       
       // D'abord récupérer les données actuelles pour préserver les champs
       const [existingRows] = await connection.query(
-        `SELECT results FROM scans 
-         WHERE user_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(results, '$.id')) = ?`,
-        [userId, projectId]
+        `SELECT results FROM scans WHERE id = ?`,
+        [projectId]
       );
       
       let resultsStructure = {
@@ -78,9 +77,8 @@ async function runScansInBackground(projectId, projectPath, userId, sourceType =
       
       // Mettre à jour avec score et pdf_report
       await connection.query(
-        `UPDATE scans SET results = ?, score = ?, pdf_report = ? 
-         WHERE user_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(results, '$.id')) = ?`,
-        [JSON.stringify(resultsStructure), score, pdfFilename, userId, projectId]
+        `UPDATE scans SET results = ?, score = ?, pdf_report = ? WHERE id = ?`,
+        [JSON.stringify(resultsStructure), score, pdfFilename, projectId]
       );
       connection.release();
       console.log(`[SCAN] Résultats sauvegardés en BDD`);
@@ -105,9 +103,10 @@ async function cloneGitRepository(gitUrl, userId, libelle_project) {
     const projectType = detectProjectType(projectPath);
 
     // Sauvegarder en BDD
+    let dbProjectId = projectId; // UUID pour le répertoire
     if (userId) {
       const connection = await pool.getConnection();
-      await connection.query(
+      const [result] = await connection.query(
         `INSERT INTO scans (user_id, project_name, libelle_project, results, score) 
          VALUES (?, ?, ?, ?, ?)`,
         [userId, gitUrl, libelle_project, JSON.stringify({ 
@@ -117,11 +116,12 @@ async function cloneGitRepository(gitUrl, userId, libelle_project) {
           projectType 
         }), 0]
       );
+      dbProjectId = result.insertId; // Récupérer l'ID BDD
       connection.release();
     }
 
     const projectInfo = {
-      id: projectId,
+      id: dbProjectId,  // <-- Retourner l'ID BDD au lieu de l'UUID
       type: "git",
       project_name: gitUrl,
       libelle_project: libelle_project,
@@ -134,7 +134,7 @@ async function cloneGitRepository(gitUrl, userId, libelle_project) {
 
     // Lancer les scans en background (ne pas bloquer la réponse)
     setImmediate(() => {
-      runScansInBackground(projectId, projectPath, userId, 'git', libelle_project);
+      runScansInBackground(dbProjectId, projectPath, userId, 'git', libelle_project);
     });
 
     return projectInfo;
@@ -145,47 +145,48 @@ async function cloneGitRepository(gitUrl, userId, libelle_project) {
 
 
 // Extrait un fichier ZIP uploadé
-function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, libelle_project = null) {
-  return new Promise((resolveMain) => {
-    const projectId = uuidv4();
-    const projectPath = path.join(UPLOAD_DIR, projectId);
+async function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, libelle_project = null) {
+  return new Promise(async (resolveMain) => {
+    const projectUuid = uuidv4();
+    const projectPath = path.join(UPLOAD_DIR, projectUuid);
 
     console.log(`Extraction du ZIP uploadé vers: ${projectPath}`);
 
     // Créer le dossier de destination
     fs.mkdirSync(projectPath, { recursive: true });
 
+    // Sauvegarder en BDD immédiatement et récupérer l'ID
+    let dbProjectId = projectUuid;
+    if (userId) {
+      const connection = await pool.getConnection();
+      try {
+        const [result] = await connection.query(
+          `INSERT INTO scans (user_id, project_name, libelle_project, results, score) 
+           VALUES (?, ?, ?, ?, ?)`,
+          [userId, `ZIP-${projectUuid}`, libelle_project, JSON.stringify({ 
+            id: projectUuid, 
+            type: 'zip_upload',
+            fileCount: 0
+          }), 0]
+        );
+        dbProjectId = result.insertId; // Récupérer l'ID BDD
+      } catch (err) {
+        console.error("Erreur sauvegarde en BDD:", err.message);
+      } finally {
+        connection.release();
+      }
+    }
+
     // Retourner immédiatement les infos basiques
     const projectInfo = {
-      id: projectId,
+      id: dbProjectId,  // <-- ID BDD au lieu de UUID
       type: "zip_upload",
-      project_name: `ZIP-${projectId}`,
+      project_name: `ZIP-${projectUuid}`,
       libelle_project: libelle_project,
       path: projectPath,
       fileCount: 0,
       createdAt: new Date(),
     };
-
-    // Sauvegarder en BDD immédiatement
-    if (userId) {
-      pool.getConnection().then(async (connection) => {
-        try {
-          await connection.query(
-            `INSERT INTO scans (user_id, project_name, libelle_project, results, score) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [userId, `ZIP-${projectId}`, libelle_project, JSON.stringify({ 
-              id: projectId, 
-              type: 'zip_upload',
-              fileCount: 0
-            }), 0]
-          );
-        } catch (err) {
-          console.error("Erreur sauvegarde en BDD:", err.message);
-        } finally {
-          connection.release();
-        }
-      });
-    }
 
     resolveMain(projectInfo);
 
@@ -194,7 +195,7 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, li
       fs.createReadStream(zipFilePath)
         .pipe(unzipper.Extract({ path: projectPath }))
         .on("close", () => {
-          console.log(`ZIP ${projectId} extrait avec succès`);
+          console.log(`ZIP ${projectUuid} extrait avec succès`);
           
           // Indexation après extraction
           try {
@@ -202,16 +203,15 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, li
             projectInfo.projectType = detectProjectType(projectPath);
             projectInfo.index = createProjectIndex(projectPath);
             projectInfo.fileCount = fileCount;
-            console.log(`ZIP ${projectId} - Indexation terminée (${fileCount} fichiers)`);
+            console.log(`ZIP ${projectUuid} - Indexation terminée (${fileCount} fichiers)`);
 
             // Mettre à jour la BDD avec les infos finales
             if (userId) {
               pool.getConnection().then(async (connection) => {
                 try {
                   await connection.query(
-                    `UPDATE scans SET results = ? WHERE user_id = ? 
-                     AND JSON_EXTRACT(results, '$.id') = ?`,
-                    [JSON.stringify(projectInfo), userId, projectId]
+                    `UPDATE scans SET results = ? WHERE id = ?`,
+                    [JSON.stringify(projectInfo), dbProjectId]
                   );
                 } catch (err) {
                   console.error("Erreur update BDD:", err.message);
@@ -222,23 +222,23 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, li
             }
 
             // Lancer les scans en background
-            runScansInBackground(projectId, projectPath, userId, 'zip', libelle_project || projectId);
+            runScansInBackground(dbProjectId, projectPath, userId, 'zip', libelle_project || projectUuid);
           } catch (err) {
-            console.warn(`Erreur indexation ZIP ${projectId}:`, err.message);
+            console.warn(`Erreur indexation ZIP ${projectUuid}:`, err.message);
           }
 
           // Nettoyer le fichier ZIP temporaire après extraction
           if (!isFromMulter && fs.existsSync(zipFilePath)) {
             try {
               fs.unlinkSync(zipFilePath);
-              console.log(`Fichier ZIP ${projectId} supprimé`);
+              console.log(`Fichier ZIP ${projectUuid} supprimé`);
             } catch (err) {
               console.warn("Impossible de supprimer le fichier temporaire:", err.message);
             }
           }
         })
         .on("error", (err) => {
-          console.error(`Erreur extraction ZIP ${projectId}:`, err.message);
+          console.error(`Erreur extraction ZIP ${projectUuid}:`, err.message);
         });
     });
   });
