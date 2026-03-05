@@ -34,11 +34,11 @@ const getProjectsByUser = async (req, res) => {
 // POST /api/projects/fetch
 const fetchProject = async (req, res) => {
   try {
-    const { gitUrl } = req.body;
+    const { gitUrl, libelle_project } = req.body;
     const uploadedFile = req.file;
     const userId = req.userId;
 
-    console.log("Fetch request - gitUrl:", gitUrl, "file:", !!uploadedFile, "userId:", userId);
+    console.log("Fetch request - gitUrl:", gitUrl, "file:", !!uploadedFile, "userId:", userId, "libelle:", libelle_project);
 
     // Cas 1: URL Git
     if (gitUrl) {
@@ -48,7 +48,7 @@ const fetchProject = async (req, res) => {
           error: "URL Git invalide" 
         });
       }
-      const projectInfo = await projectService.cloneGitRepository(gitUrl, userId);
+      const projectInfo = await projectService.cloneGitRepository(gitUrl, userId, libelle_project);
       return res.status(201).json({
         success: true,
         message: "Projet Git cloné",
@@ -65,7 +65,7 @@ const fetchProject = async (req, res) => {
         });
       }
       
-      const projectInfo = await projectService.extractUploadedZip(uploadedFile.path, true, userId);
+      const projectInfo = await projectService.extractUploadedZip(uploadedFile.path, true, userId, libelle_project);
       
       return res.status(201).json({
         success: true,

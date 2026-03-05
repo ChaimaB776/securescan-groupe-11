@@ -2,10 +2,11 @@ const security = require("eslint-plugin-security");
 
 module.exports = [
   {
-    plugins: { security },
+    plugins: {
+      security
+    },
     rules: {
-      "security/detect-object-injection": "warn",
-      "security/detect-eval-with-expression": "error"
+      ...security.configs.recommended.rules
     }
   }
 ];

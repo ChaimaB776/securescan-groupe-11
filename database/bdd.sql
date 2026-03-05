@@ -20,6 +20,7 @@ CREATE TABLE scans (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     project_name VARCHAR(255) NOT NULL,
+    libelle_project VARCHAR(255) NOT NULL,
     score INT NOT NULL,
     results JSON NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

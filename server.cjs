@@ -1,5 +1,5 @@
 const express = require("express");
-const { exec } = require("child_process");
+const { exec,spawn } = require("child_process");
 const util = require("util");
 const fs = require("fs");
 const path = require("path");
@@ -56,7 +56,7 @@ async function scanProject(REPO_PATH) {
 
   // SEMGREP
   try {
-    const { stdout } = await execAsync(`semgrep --config auto ${REPO_PATH} --json`);
+    const { stdout } = await execAsync(`semgrep --config auto "${REPO_PATH}" --json`);
     const parsed = JSON.parse(stdout);
     const results = parsed.results || [];
 
@@ -76,10 +76,10 @@ async function scanProject(REPO_PATH) {
 
   // ESLINT
   try {
-  const { stdout } = await execAsync(
-    `npx eslint "${REPO_PATH}/**/*.js" -f json`,
-    { maxBuffer: 1024 * 1024 * 5 }
-  );
+const { stdout } = await execAsync(
+  `npx eslint "${REPO_PATH}" --ext .js -f json --no-config-lookup`,
+  { maxBuffer: 1024 * 1024 * 5 }
+);
 
   const results = JSON.parse(stdout);
 
@@ -118,8 +118,10 @@ async function scanProject(REPO_PATH) {
   // NPM AUDIT
   // NPM AUDIT
 try {
-  const { stdout } = await execAsync(`npm audit --json`, { cwd: REPO_PATH });
-  processAudit(stdout);
+  if (fs.existsSync(path.join(REPO_PATH, "package.json"))) {
+    const { stdout } = await execAsync(`npm audit --json`, { cwd: REPO_PATH });
+    processAudit(stdout);
+  }
 } catch (err) {
   if (err.stdout) {
     processAudit(err.stdout);
@@ -145,27 +147,57 @@ function processAudit(raw) {
   }
 }
 
-  // TruffleHog
-  // try {
-   //  const { stdout } = await execAsync(`trufflehog --json ${REPO_PATH}`, { maxBuffer: 1024 * 1024 * 10 });
-    // const results = JSON.parse(stdout);
-   //  results.forEach(vuln => {
-    //   allVulnerabilities.push({
-    //     tool: "TruffleHog",
-    //     title: vuln.reason || "Potential secret",
-    //     severity: "CRITICAL",
-    //     file: vuln.path,
-    //     line: 0,
-    //     owasp: mapToOWASP("TruffleHog")
-    //   });
-    // });
- //  } catch (err) {
-  //   console.log("TruffleHog error:", err.message);
-  // }
+// TRUFFLEHOG 
+async function scanTruffleHog(REPO_PATH) {
+  return new Promise((resolve, reject) => {
+    let vulnerabilities = [];
 
-  return allVulnerabilities;
+    const trufflehog = spawn("trufflehog", [
+      "filesystem",   //obligatoire pour scanner un dossier local
+      REPO_PATH,
+      "--json"
+    ]);
+
+    trufflehog.stdout.on("data", (data) => {
+      const lines = data.toString().split("\n").filter(Boolean);
+
+      lines.forEach(line => {
+        try {
+          const vuln = JSON.parse(line);
+
+          vulnerabilities.push({
+            tool: "TruffleHog",
+            title: vuln.reason || "Secret detected",
+            severity: "CRITICAL",
+            file: vuln.path || "unknown",
+            line: vuln.line || 0,
+            owasp: mapToOWASP("TruffleHog")
+          });
+        } catch (err) {
+          console.log("JSON parse error:", err.message);
+        }
+      });
+    });
+
+    trufflehog.stderr.on("data", (data) => {
+      console.log("TruffleHog stderr:", data.toString());
+    });
+
+    trufflehog.on("close", () => resolve(vulnerabilities));
+    trufflehog.on("error", reject);
+  });
 }
 
+  // Usage dans scanProject
+  try {
+    const truffleResults = await scanTruffleHog(REPO_PATH);
+    allVulnerabilities.push(...truffleResults);
+  } catch (err) {
+    console.log("TruffleHog error:", err.message);
+  }
+
+return allVulnerabilities;
+}
 // -------------------------
 // ROUTES
 // -------------------------
@@ -211,6 +243,7 @@ app.post("/api/projects/fetch", upload.single("project"), async (req, res) => {
       path: projectPath,
       createdAt: new Date(),
       results: allVulnerabilities,
+      vulnerabilitiesCount: allVulnerabilities.length,
       score
     }, null, 2));
 

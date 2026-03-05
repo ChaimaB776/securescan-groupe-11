@@ -34,7 +34,6 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "eslint": "^10.0.2",
-    "semgrep": "^0.0.1"
+    "eslint": "^10.0.2"
   }
 }
