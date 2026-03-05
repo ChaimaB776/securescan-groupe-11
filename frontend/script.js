@@ -486,9 +486,19 @@ ${vuln.description || "N/A"}
 if (window.location.pathname.includes("dashboard.html")) {
     loadDashboard();
     const projectId = localStorage.getItem("projectId");
+    const projectData = JSON.parse(localStorage.getItem("projectData"));
+    
     if (projectId) {
-        console.log("[DEBUG] Lancement du polling pour:", projectId);
-        loadScanResults(projectId);
+        // Si les résultats existent déjà (ancien projet), les afficher directement
+        // Note: getProjectWithResults retourne "vulnerabilities" au lieu de "results"
+        if (projectData && projectData.score !== null && projectData.vulnerabilities && Array.isArray(projectData.vulnerabilities)) {
+            console.log("[DEBUG] Résultats existants trouvés, affichage direct");
+            displayScanResults(projectData.score, projectData.vulnerabilities);
+        } else {
+            // Nouveau scan en cours, lancer le polling
+            console.log("[DEBUG] Lancement du polling pour:", projectId);
+            loadScanResults(projectId);
+        }
     } else {
         console.log("[DEBUG] Pas de projectId trouvé");
     }
