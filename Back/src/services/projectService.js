@@ -8,6 +8,7 @@ const { detectProjectType, createProjectIndex, countFiles } = require("../utils/
 const pool = require("../config/database");
 const scanService = require("./scanService");
 const { mapToOWASP } = require("../utils/owaspMapper");
+const { generatePDF } = require("./pdfService");
 
 const execPromise = promisify(exec);
 
@@ -25,7 +26,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
  * @param {number} userId - ID utilisateur
  * @param {string} sourceType - Type de source: 'git' ou 'zip'
  */
-async function runScansInBackground(projectId, projectPath, userId, sourceType = 'git') {
+async function runScansInBackground(projectId, projectPath, userId, sourceType = 'git', projectName = 'Project') {
   try {
     console.log(`\n[SCAN] Démarrage des scans pour ${projectId} (${sourceType})`);
     
@@ -42,6 +43,9 @@ async function runScansInBackground(projectId, projectPath, userId, sourceType =
     const score = scanService.calculateScore(vulnsWithOWASP);
     
     console.log(`[SCAN] Résultats: ${vulnsWithOWASP.length} vulnérabilité(s), Score: ${score}/100`);
+    
+    // Générer le PDF
+    const pdfFilename = await generatePDF(projectName, score, vulnsWithOWASP);
     
     // Mettre à jour la BDD
     if (userId) {
@@ -72,10 +76,11 @@ async function runScansInBackground(projectId, projectPath, userId, sourceType =
         };
       }
       
+      // Mettre à jour avec score et pdf_report
       await connection.query(
-        `UPDATE scans SET results = ?, score = ? 
+        `UPDATE scans SET results = ?, score = ?, pdf_report = ? 
          WHERE user_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(results, '$.id')) = ?`,
-        [JSON.stringify(resultsStructure), score, userId, projectId]
+        [JSON.stringify(resultsStructure), score, pdfFilename, userId, projectId]
       );
       connection.release();
       console.log(`[SCAN] Résultats sauvegardés en BDD`);
@@ -129,7 +134,7 @@ async function cloneGitRepository(gitUrl, userId, libelle_project) {
 
     // Lancer les scans en background (ne pas bloquer la réponse)
     setImmediate(() => {
-      runScansInBackground(projectId, projectPath, userId, 'git');
+      runScansInBackground(projectId, projectPath, userId, 'git', libelle_project);
     });
 
     return projectInfo;
@@ -217,7 +222,7 @@ function extractUploadedZip(zipFilePath, isFromMulter = false, userId = null, li
             }
 
             // Lancer les scans en background
-            runScansInBackground(projectId, projectPath, userId, 'zip');
+            runScansInBackground(projectId, projectPath, userId, 'zip', libelle_project || projectId);
           } catch (err) {
             console.warn(`Erreur indexation ZIP ${projectId}:`, err.message);
           }
@@ -343,5 +348,49 @@ module.exports = {
   deleteProject,
   listProjects,
   getProjectsByUserId,
+  getProjectWithResults,
   UPLOAD_DIR,
 };
+
+/**
+ * Récupère un projet avec ses résultats de scan depuis la BDD
+ */
+async function getProjectWithResults(projectId, userId) {
+  try {
+    const connection = await pool.getConnection();
+    
+    // Chercher d'abord par ID numérique de la table
+    const [rows] = await connection.query(
+      `SELECT id, project_name, libelle_project, results, score, pdf_report, created_at 
+       FROM scans 
+       WHERE user_id = ? AND id = ?`,
+      [userId, projectId]
+    );
+    
+    connection.release();
+    
+    if (rows.length === 0) {
+      throw new Error("Projet non trouvé");
+    }
+    
+    const row = rows[0];
+    const results = typeof row.results === 'string' ? JSON.parse(row.results) : row.results;
+    
+    return {
+      id: row.id,
+      uuid: results.id,
+      type: results.type,
+      project_name: row.project_name,
+      libelle_project: row.libelle_project,
+      fileCount: results.fileCount,
+      projectType: results.projectType,
+      score: row.score,
+      pdf_report: row.pdf_report,
+      vulnerabilities: results.vulnerabilities || [],
+      createdAt: row.created_at,
+    };
+  } catch (error) {
+    console.error("❌ Erreur récupération projet:", error.message);
+    throw error;
+  }
+}

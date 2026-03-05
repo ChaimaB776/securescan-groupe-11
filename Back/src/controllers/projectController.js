@@ -90,9 +90,10 @@ const fetchProject = async (req, res) => {
 
 // Récupère les infos d'un projet
 // GET /api/projects/:projectId
-const getProject = (req, res) => {
+const getProject = async (req, res) => {
   try {
     const { projectId } = req.params;
+    const userId = req.userId;
 
     if (!projectId) {
       return res.status(400).json({ 
@@ -101,7 +102,7 @@ const getProject = (req, res) => {
       });
     }
 
-    const projectInfo = projectService.getProjectInfo(projectId);
+    const projectInfo = await projectService.getProjectWithResults(projectId, userId);
 
     res.json({
       success: true,
@@ -118,20 +119,48 @@ const getProject = (req, res) => {
 
 // Liste tous les projets en cache
 // GET /api/projects
-const listProjects = (req, res) => {
+const listProjects = async (req, res) => {
   try {
-    const projects = projectService.listProjects();
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Non authentifié"
+      });
+    }
+
+    const pool = require("../config/database");
+    const connection = await pool.getConnection();
+    
+    // Récupérer tous les scans de cet utilisateur depuis la BDD
+    const [projects] = await connection.query(
+      `SELECT id, user_id, project_name, libelle_project, score, pdf_report, created_at as createdAt
+       FROM scans 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    
+    connection.release();
 
     res.json({
       success: true,
       count: projects.length,
-      projects: projects,
+      projects: projects.map(p => ({
+        id: p.id,
+        project_name: p.project_name,
+        libelle_project: p.libelle_project,
+        score: p.score,
+        pdf_report: p.pdf_report,
+        createdAt: new Date(p.createdAt).toLocaleDateString('fr-FR')
+      }))
     });
   } catch (error) {
     console.error("Erreur listProjects:", error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message
     });
   }
 };
@@ -171,10 +200,43 @@ const deleteProject = (req, res) => {
   }
 };
 
+// Télécharge le PDF du rapport de scan
+// GET /api/projects/:projectId/pdf/download
+const downloadPDF = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.userId;
+
+    if (!projectId) {
+      return res.status(400).json({ success: false, error: "projectId requis" });
+    }
+
+    const project = await projectService.getProjectWithResults(projectId, userId);
+    
+    if (!project.pdf_report) {
+      return res.status(404).json({ success: false, error: "Aucun PDF disponible" });
+    }
+
+    const fs = require("fs");
+    const path = require("path");
+    const pdfPath = path.join(__dirname, `../../reports/${project.pdf_report}`);
+
+    if (!fs.existsSync(pdfPath)) {
+      return res.status(404).json({ success: false, error: "Fichier PDF non trouvé" });
+    }
+
+    res.download(pdfPath, `SecureScan-${project.libelle_project}.pdf`);
+  } catch (error) {
+    console.error("Erreur downloadPDF:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   fetchProject,
   getProject,
   listProjects,
   deleteProject,
   getProjectsByUser,
+  downloadPDF,
 };

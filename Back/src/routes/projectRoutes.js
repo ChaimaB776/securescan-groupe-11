@@ -22,6 +22,7 @@ const upload = multer({
 router.post("/fetch", authMiddleware, upload.single("project"), projectController.fetchProject);
 router.get("/user/projects", authMiddleware, projectController.getProjectsByUser);
 router.get("/", authMiddleware, projectController.listProjects);
+router.get("/:projectId/pdf/download", authMiddleware, projectController.downloadPDF);
 router.get("/:projectId", authMiddleware, projectController.getProject);
 router.delete("/:projectId", authMiddleware, projectController.deleteProject);
 module.exports = router;
