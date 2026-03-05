@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureScan - Profil</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="card large">
+        <h1>👤 Mon Profil</h1>
+
+        <h2>📂 Mes projets analysés</h2>
+
+        <div id="projectsList">
+            Chargement...
+        </div>
+
+        <div class="actions">
+            <button class="secondary" onclick="window.location.href='index.html'">
+                🔙 Retour
+            </button>
+
+            <button class="secondary" onclick="logout()">
+                🚪 Se déconnecter
+            </button>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+<script>
+    loadUserProjects();
+</script>
+
+</body>
+</html>
