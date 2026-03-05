@@ -128,7 +128,7 @@ npm run dev
 
 ```
 Back/src/
-├── controllers/     # Logique des endpoints
+├── controllers/    # Logique des endpoints
 ├── routes/         # Définition des routes API
 ├── services/       # Métier (scanning, PDF, projets)
 ├── utils/          # Helpers (OWASP mapping, détection type)

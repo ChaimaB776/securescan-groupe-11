@@ -1,10 +1,10 @@
 {
   "name": "back",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.cjs",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "node src/server.cjs",
+    "dev": "nodemon src/server.cjs"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +21,7 @@
     "multer": "^2.1.0",
     "mysql2": "^3.18.2",
     "pdfkit": "^0.17.2",
+    "simple-git": "^3.32.3",
     "unzipper": "^0.10.14",
     "uuid": "^9.0.0"
   },
