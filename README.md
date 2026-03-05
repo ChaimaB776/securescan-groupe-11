@@ -139,7 +139,8 @@ Back/src/
 
 ```
 frontend/
-├── index.html      # Login/Signup
+├── login.html      # Login/Signup
+├── index.html      # page d'upload du code
 ├── dashboard.html  # Résultats d'analyse
 ├── profile.html    # Gestion des projets
 └── script.js       # Logique client + polling
